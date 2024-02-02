@@ -87,10 +87,12 @@ def process(
     re_mask_patterns: list[Pattern],
 ):
     logging.info('Processing %s', scan_dir)
-    for file_name in listdir(scan_dir):
+    files_list = listdir(scan_dir)
+    for file_name in files_list:
         processed_file = scan_dir.joinpath(file_name)
         if processed_file.is_file():
             logging.info('Processing %s', processed_file)
+            parsed = False
             for pattern, compiled_pattern, re_filename_pattern in zip(rules, re_compiled, re_mask_patterns):
                 if re_filename_pattern.search(file_name):
                     logging.info('Processing file %s with rule %s', processed_file, pattern.pattern)
@@ -100,9 +102,14 @@ def process(
                         if is_error:
                             logging.error('Exit now')
                             sys_exit(1)
+                    parsed = True
+            if not parsed:
+                logging.warning('File %s does not match any rules', file_name)
             # remove processed file
             processed_file.rename(archive_dir.joinpath(file_name))
             logging.info('Moved file %s to archive', processed_file)
+    if len(files_list) == 0:
+        logging.info('Folder %s is empty', scan_dir)
     logging.info('Processing complete, exit now')
 
 

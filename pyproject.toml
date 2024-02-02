@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "blacklist-loader"
-version = "0.3.0"
+version = "0.4.0"
 description = ""
 authors = ["Dmitriev Andrey <justkeepwalking@yandex.ru>"]
 readme = "README.md"
