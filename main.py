@@ -17,7 +17,7 @@ from yaml import load as load_yaml
 
 from config_classes import BlackListConnConfig
 from config_classes import LoaderConfig
-from config_classes import PatternDesc
+from config_classes import Rule
 from settings import CUR_TZ
 from settings import LOG_FORMAT
 from settings import LOGGING_LEVEL
@@ -82,15 +82,16 @@ def process(
     scan_dir: Path,
     archive_dir: Path,
     blacklist: BlackListConnConfig,
-    patterns: list[PatternDesc],
+    rules: list[Rule],
     re_compiled: list[Pattern],
     re_mask_patterns: list[Pattern],
 ):
+    logging.info('Processing %s', scan_dir)
     for file_name in listdir(scan_dir):
         processed_file = scan_dir.joinpath(file_name)
         if processed_file.is_file():
             logging.info('Processing %s', processed_file)
-            for pattern, compiled_pattern, re_filename_pattern in zip(patterns, re_compiled, re_mask_patterns):
+            for pattern, compiled_pattern, re_filename_pattern in zip(rules, re_compiled, re_mask_patterns):
                 if re_filename_pattern.search(file_name):
                     logging.info('Processing file %s with rule %s', processed_file, pattern.pattern)
                     addresses = parse_file(processed_file, compiled_pattern)
@@ -102,6 +103,7 @@ def process(
             # remove processed file
             processed_file.rename(archive_dir.joinpath(file_name))
             logging.info('Moved file %s to archive', processed_file)
+    logging.info('Processing complete, exit now')
 
 
 def main():
@@ -129,22 +131,22 @@ def main():
     assert archive_dir.is_dir(), f'Archive directory {archive_dir} does not exist'
 
     # compile rules
-    re_compiled: list[Pattern] = [x for x in map(re_compile, map(lambda x: x.pattern, config.patterns))]
+    re_compiled: list[Pattern] = [x for x in map(re_compile, map(lambda x: x.pattern, config.rules))]
     # compile file masks
     re_mask_patterns: list[Pattern] = [
         x
         for x in map(
             re_compile,
-            map(lambda x: '^' + x.file_mask.replace('.', '\\.').replace('*', '.*') + '$', config.patterns),
+            map(lambda x: '^' + x.file_mask.replace('.', '\\.').replace('*', '.*') + '$', config.rules),
         )
     ]
     # checking rules on startup
-    for rule, pattern in zip(re_compiled, config.patterns):
-        if pattern.check_value:
-            if parse_address(rule, pattern.check_value) is None:
-                logging.error('Error while checking regex rule, no address detected, rule: %s', pattern.pattern)
+    for re_rule, rule in zip(re_compiled, config.rules):
+        if rule.check_value:
+            if parse_address(re_rule, rule.check_value) is None:
+                logging.error('Error while checking regex rule, no address detected, rule: %s', rule.pattern)
                 sys_exit(1)
-    process(scan_dir, archive_dir, config.blacklist, config.patterns, re_compiled, re_mask_patterns)
+    process(scan_dir, archive_dir, config.blacklist, config.rules, re_compiled, re_mask_patterns)
 
 
 if __name__ == '__main__':
