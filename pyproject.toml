@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "blacklist-loader"
+version = "0.1.0"
+description = ""
+authors = ["Dmitriev Andrey <justkeepwalking@yandex.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyyaml = "^6.0.1"
+requests = "^2.31.0"
+tomli = "^2.0.1"
+pydantic = "^2.6.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.1.1"
+mypy = "^1.8.0"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+types-requests = "^2.31.0.20240125"
+types-pyyaml = "^6.0.12.12"
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+line_length = 120
+force_single_line = true
+
+[tool.mypy]
+python_version = 3.11
+plugins = []
+check_untyped_defs = true
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+skip-string-normalization = true
