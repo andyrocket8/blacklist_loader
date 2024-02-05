@@ -1,71 +1,20 @@
 import logging
 from argparse import ArgumentParser
-from datetime import datetime as dt_datetime
-from ipaddress import IPv4Address
-from os import listdir
 from pathlib import Path
 from re import Pattern
 from re import compile as re_compile
 from sys import exit as sys_exit
-from typing import Optional
 
-from requests import JSONDecodeError
-from requests import RequestException
-from requests import post
 from yaml import Loader
 from yaml import load as load_yaml
 
-from config_classes import BlackListConnConfig
+from address_file_utils import parse_address
 from config_classes import LoaderConfig
-from config_classes import Rule
-from settings import CUR_TZ
+from process import process_folder
+from service import BlacklistService
 from settings import LOG_FORMAT
 from settings import LOGGING_LEVEL
 from version import get_version
-
-
-def parse_address(pattern: Pattern, file_string) -> Optional[IPv4Address]:
-    match = pattern.search(file_string)
-    if match:
-        # suppose all regular expression is IP address or first matched group if we need more granular filtering
-        return IPv4Address(match[1] if len(match.groups()) else match[0])
-    return None
-
-
-def parse_file(file_name: Path, pattern: Pattern) -> set[IPv4Address]:
-    """Parse addresses from file"""
-    addresses: set[IPv4Address] = set()
-    with open(file_name, mode='r') as f:
-        file_str = f.readline()
-        while file_str:
-            address = parse_address(pattern, file_str)
-            if address is not None:
-                addresses.add(address)
-            file_str = f.readline()
-    return addresses
-
-
-def save_addresses(bl_config: BlackListConnConfig, addresses: set[IPv4Address]) -> bool:
-    """Save data to blacklist"""
-    headers = {}
-    if bl_config.token:
-        headers['authorization'] = f'Bearer {bl_config.token}'
-    data = {
-        'source_agent': bl_config.agent_name,
-        'action_time': dt_datetime.now(tz=CUR_TZ).strftime('%Y-%m-%dT%H:%M:%S.%f%z'),
-        'addresses': [str(x) for x in addresses],
-    }
-    try:
-        response = post(bl_config.uri, headers=headers, json=data)
-        response.raise_for_status()
-        records_added: int = response.json().get('added')
-        logging.info('Successfully added %d records to blacklist application', records_added)
-        return False
-    except JSONDecodeError as e:
-        logging.error('Error while decoding blacklist app response, details: %s', str(e))
-    except RequestException as e:
-        logging.error('Error while executing request to blacklist application, details: %s', str(e))
-    return True
 
 
 def init_logging():
@@ -76,41 +25,6 @@ def init_logging():
     console_handler.setFormatter(formatter)
     handlers.append(console_handler)
     logging.basicConfig(level=LOGGING_LEVEL, handlers=handlers)
-
-
-def process(
-    scan_dir: Path,
-    archive_dir: Path,
-    blacklist: BlackListConnConfig,
-    rules: list[Rule],
-    re_compiled: list[Pattern],
-    re_mask_patterns: list[Pattern],
-):
-    logging.info('Processing %s', scan_dir)
-    files_list = listdir(scan_dir)
-    for file_name in files_list:
-        processed_file = scan_dir.joinpath(file_name)
-        if processed_file.is_file():
-            logging.info('Processing %s', processed_file)
-            parsed = False
-            for pattern, compiled_pattern, re_filename_pattern in zip(rules, re_compiled, re_mask_patterns):
-                if re_filename_pattern.search(file_name):
-                    logging.info('Processing file %s with rule %s', processed_file, pattern.pattern)
-                    addresses = parse_file(processed_file, compiled_pattern)
-                    if addresses:
-                        is_error = save_addresses(blacklist, addresses)
-                        if is_error:
-                            logging.error('Exit now')
-                            sys_exit(1)
-                    parsed = True
-            if not parsed:
-                logging.warning('File %s does not match any rules', file_name)
-            # remove processed file
-            processed_file.rename(archive_dir.joinpath(file_name))
-            logging.info('Moved file %s to archive', processed_file)
-    if len(files_list) == 0:
-        logging.info('Folder %s is empty', scan_dir)
-    logging.info('Processing complete, exit now')
 
 
 def main():
@@ -133,9 +47,11 @@ def main():
 
     # checking directories
     scan_dir = Path(config.source)
-    assert scan_dir.is_dir(), f'Source directory {scan_dir} does not exist'
+    assert scan_dir.is_dir(), f'Source folder {scan_dir} does not exist'
     archive_dir = Path(config.archive)
-    assert archive_dir.is_dir(), f'Archive directory {archive_dir} does not exist'
+    assert archive_dir.is_dir(), f'Archive folder {archive_dir} does not exist'
+    reject_dir = Path(config.reject)
+    assert reject_dir.is_dir(), f'Reject folder {reject_dir} does not exist'
 
     # compile rules
     re_compiled: list[Pattern] = [x for x in map(re_compile, map(lambda x: x.pattern, config.rules))]
@@ -149,11 +65,14 @@ def main():
     ]
     # checking rules on startup
     for re_rule, rule in zip(re_compiled, config.rules):
-        if rule.check_value:
-            if parse_address(re_rule, rule.check_value) is None:
-                logging.error('Error while checking regex rule, no address detected, rule: %s', rule.pattern)
-                sys_exit(1)
-    process(scan_dir, archive_dir, config.blacklist, config.rules, re_compiled, re_mask_patterns)
+        if rule.check_value and parse_address(re_rule, rule.check_value) is None:
+            logging.error('Error while checking regex rule, no address detected, rule: %s', rule.pattern)
+            sys_exit(1)
+    # init Blacklist connection service
+    service = BlacklistService(config.blacklist)
+    process_folder(
+        scan_dir, archive_dir, reject_dir, config.rules, re_compiled, re_mask_patterns, service, config.stop_on_error
+    )
 
 
 if __name__ == '__main__':

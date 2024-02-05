@@ -45,6 +45,8 @@ blacklist:
 
 source: /home/core/develop/secure/stuff/file_loader/files     # Folder to process 
 archive: /home/core/develop/secure/stuff/file_loader/archive  # Folder to archive file after processing 
+reject: /home/core/develop/secure/stuff/file_loader/reject    # Folder to place file after processing error
+stop_on_error: true                                           # Whether exit on first error
 
 rules:  # Processing rules  
     - file_mask: "*.csv"    # File mask
