@@ -4,6 +4,7 @@ from ipaddress import IPv4Address
 from os import listdir
 from pathlib import Path
 from re import Pattern
+from shutil import move as sh_move
 from sys import exit as sys_exit
 
 from address_file_utils import parse_address_file
@@ -45,11 +46,11 @@ def process_file(
         file_process_error = service.save_data(address_set) or file_process_error
     if file_process_error:
         # move rejected file to reject folder
-        processed_file.rename(reject_dir.joinpath(processed_file.name))
+        sh_move(processed_file, reject_dir.joinpath(processed_file.name))
         logging.info('Moved reject file %s to reject folder', processed_file)
     else:
         # archive processed file
-        processed_file.rename(archive_dir.joinpath(processed_file.name))
+        sh_move(processed_file, archive_dir.joinpath(processed_file.name))
         logging.info('Moved file %s to archive folder', processed_file)
     return file_process_error
 
