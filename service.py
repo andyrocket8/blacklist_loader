@@ -34,6 +34,8 @@ class BlacklistService(Service):
             'action_time': dt_datetime.now(tz=CUR_TZ).strftime('%Y-%m-%dT%H:%M:%S.%f%z'),
             'addresses': [str(x) for x in addresses],
         }
+        if self.bl_config.address_group:
+            data['address_group'] = self.bl_config.address_group
         try:
             response = post(self.bl_config.uri, headers=headers, json=data)
             response.raise_for_status()
@@ -44,4 +46,7 @@ class BlacklistService(Service):
             logging.error('Error while decoding blacklist app response, details: %s', str(e))
         except RequestException as e:
             logging.error('Error while executing request to blacklist application, details: %s', str(e))
+            if e.response is not None:
+                # try to parse response
+                logging.error(f'Status code for response: {e.response.status_code}, response text: {e.response.text}')
         return True

@@ -42,6 +42,8 @@ blacklist:
     uri: http://127.0.0.1:8000/addresses/banned/add   # URI of add method
     agent_name: Loader parser                         # Agent name 
     token:                                            # Specify if Blacklist App authorization is ON
+    address_group: default                            # Specify address group or don't fill it to pass data to 'default' address group of Blacklist application.
+    # address_group might be filled for interaction with Blacklist application rom version 1.8.x
 
 source: /home/core/develop/secure/stuff/file_loader/files     # Folder to process 
 archive: /home/core/develop/secure/stuff/file_loader/archive  # Folder to archive file after processing 

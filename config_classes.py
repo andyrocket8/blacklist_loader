@@ -5,6 +5,7 @@ class BlackListConnConfig(BaseModel):
     uri: str  # connection uri (with handle connection path)
     agent_name: str  # agent name for data bundle (passed on every handle call)
     token: str = ''  # connection token (provide if data loading handles are secured with token
+    address_group: str = ''  # address group passed in HTTP request
 
 
 class Rule(BaseModel):
